@@ -184,9 +184,12 @@ async function boot(){
 }
 
 /* ---------- usage ---------- */
-function setUsage(used,limit){S.used=+used;S.limit=+limit;
- $('#usage').textContent=S.limit>=10000?'Unlimited messages':Math.max(S.limit-S.used,0)+' of '+S.limit+' messages left today'}
-async function loadUsage(){try{const r=await fetch('/api/chat',{headers:{Authorization:'Bearer '+await token()}});if(r.ok){const j=await r.json();setUsage(j.used,j.limit)}}catch{}}
+function setUsage(used,limit,reset,busy){S.used=+used;S.limit=+limit;
+ const fmt=r=>{r=+r||0;const h=Math.floor(r/3600),m=Math.ceil((r%3600)/60);return h>0?h+' h '+m+' min':Math.max(m,1)+' min'};
+ let t;if(S.limit>=10000)t='Unlimited messages';
+ else{t=Math.max(S.limit-S.used,0)+' of '+S.limit+' messages left';if(+reset>0)t+=' (resets in '+fmt(reset)+')';if(busy===true||busy==='true')t+='. High demand right now, limits are lowered.'}
+ $('#usage').textContent=t}
+async function loadUsage(){try{const r=await fetch('/api/chat',{headers:{Authorization:'Bearer '+await token()}});if(r.ok){const j=await r.json();setUsage(j.used,j.limit,j.reset,j.busy)}}catch{}}
 
 /* ---------- chats ---------- */
 async function loadChats(){const{data,error}=await sb.from('chats').select('id,title,mode,updated_at').order('updated_at',{ascending:false});
@@ -317,7 +320,7 @@ async function run(){
  try{
   const res=await fetch('/api/chat',{method:'POST',signal:S.ctrl.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+await token()},body:JSON.stringify({messages:payload,mode:S.mode,model:S.model})});
   if(!res.ok){const j=await res.json().catch(()=>({}));throw new Error(j.error||'Error '+res.status)}
-  setUsage(res.headers.get('X-Used'),res.headers.get('X-Limit'));
+  setUsage(res.headers.get('X-Used'),res.headers.get('X-Limit'),res.headers.get('X-Reset'),res.headers.get('X-Busy'));
   const rd=res.body.getReader(),dec=new TextDecoder();let buf='';
   for(;;){const{done,value}=await rd.read();if(done)break;
    buf+=dec.decode(value,{stream:true});const parts=buf.split('\n\n');buf=parts.pop();
