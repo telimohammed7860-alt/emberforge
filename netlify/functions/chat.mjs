@@ -1,12 +1,22 @@
-// Emberforge backend for Netlify (Functions v2, streaming). Verifies login, enforces the daily limit, streams Claude's reply.
+// Emberforge backend for Netlify (Functions v2, streaming). Verifies login, enforces the daily limit, streams the AI reply (Gemini via its OpenAI-compatible API).
 const env = (k) => (typeof Netlify !== 'undefined' ? Netlify.env.get(k) : process.env[k]);
 const SB = (env('SUPABASE_URL') || '').replace(/\/$/, '');
 const KEY = env('SUPABASE_SERVICE_ROLE_KEY');
 const MODELS = {
-  fast: { id: 'claude-haiku-5-5', max: 8000 },
-  balanced: { id: 'claude-sonnet-5-5', max: 16000 },
-  max: { id: 'claude-opus-5-5', max: 16000 }
+  fast: { id: env('AI_MODEL_FAST') || 'gemini-flash-lite-latest', max: 8000 },
+  balanced: { id: env('AI_MODEL_BALANCED') || 'gemini-flash-latest', max: 16000 },
+  max: { id: env('AI_MODEL_MAX') || 'gemini-flash-latest', max: 16000 }
 };
+function toOpenAI(system, messages) {
+  const out = [{ role: 'system', content: system }];
+  for (const m of messages) {
+    if (typeof m.content === 'string') out.push({ role: m.role, content: m.content });
+    else out.push({ role: m.role, content: m.content.map(b => b.type === 'text'
+      ? { type: 'text', text: b.text }
+      : { type: 'image_url', image_url: { url: `data:${b.source.media_type};base64,${b.source.data}` } }) });
+  }
+  return out;
+}
 const BASE = "You are Emberforge, an AI assistant that builds websites and apps and writes high-level code. Reply in the same language the user writes in (Hindi, Hinglish, English, etc.) and keep explanations simple and direct. Make sensible assumptions instead of asking many questions. Always write complete, working code, never placeholders like 'rest of the code here'. ";
 const MODES = {
   website: BASE + "Task: build a website. Output ONE complete, self-contained, responsive HTML file (inline CSS and JS) in a single ```html block. Use modern, distinctive design, real-sounding copy (no lorem ipsum), good accessibility. Use CDN libraries only when really needed. After the code, add 2-4 short lines on what you built and how to customise it.",
@@ -49,8 +59,8 @@ function clean(messages) {
   return out.length && out[out.length - 1].role === 'user' ? out : null;
 }
 export default async (req) => {
-  if (!SB || !KEY || !env('ANTHROPIC_API_KEY'))
-    return J(500, { error: 'Server is not set up yet. Add the 3 environment variables in Netlify and redeploy.' });
+  if (!SB || !KEY || !env('GEMINI_API_KEY'))
+    return J(500, { error: 'Server is not set up yet. Add the 3 environment variables (GEMINI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) in Netlify and redeploy.' });
   const token = (req.headers.get('authorization') || '').replace(/^Bearer /, '');
   if (!token) return J(401, { error: 'Please sign in.' });
   const user = await getUser(token);
@@ -69,19 +79,49 @@ export default async (req) => {
   if (q.allowed === undefined) return J(500, { error: 'Usage check failed. Did you run schema.sql?' });
   if (!q.allowed) return J(429, { error: `Daily limit reached (${q.limit} messages). It resets at midnight IST.` });
 
+  const base = (env('AI_BASE_URL') || 'https://generativelanguage.googleapis.com/v1beta/openai').replace(/\/$/, '');
   try {
-    const up = await fetch('https://api.anthropic.com/v1/messages', {
+    const up = await fetch(base + '/chat/completions', {
       method: 'POST',
       signal: req.signal,
-      headers: { 'content-type': 'application/json', 'x-api-key': env('ANTHROPIC_API_KEY'), 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: model.id, max_tokens: model.max, system, messages, stream: true })
+      headers: { 'content-type': 'application/json', Authorization: 'Bearer ' + env('GEMINI_API_KEY') },
+      body: JSON.stringify({ model: model.id, max_tokens: model.max, stream: true, messages: toOpenAI(system, messages) })
     });
     if (!up.ok) {
       await rpc('refund_message', { p_user: user.id });
-      const e = await up.json().catch(() => ({}));
-      return J(502, { error: (e.error && e.error.message) || 'AI service error. Try again.' });
+      const raw = await up.text();
+      let msg = 'AI service error. Try again.';
+      try { const e = JSON.parse(raw); const x = Array.isArray(e) ? e[0] : e; if (x && x.error && x.error.message) msg = x.error.message; } catch (e) {}
+      return J(502, { error: msg.slice(0, 300) });
     }
-    return new Response(up.body, {
+    const enc = new TextEncoder(), dec = new TextDecoder();
+    const out = new ReadableStream({
+      async start(ctrl) {
+        const emit = (o) => { try { ctrl.enqueue(enc.encode('data: ' + JSON.stringify(o) + '\n\n')); } catch (e) {} };
+        const rd = up.body.getReader();
+        let buf = '';
+        try {
+          for (;;) {
+            const { done, value } = await rd.read();
+            if (done) break;
+            buf += dec.decode(value, { stream: true });
+            const lines = buf.split('\n');
+            buf = lines.pop();
+            for (const l of lines) {
+              if (!l.startsWith('data:')) continue;
+              const d = l.slice(5).trim();
+              if (!d || d === '[DONE]') continue;
+              let j; try { j = JSON.parse(d); } catch (e) { continue; }
+              const t = j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content;
+              if (t) emit({ type: 'content_block_delta', delta: { type: 'text_delta', text: t } });
+              else if (j.error) emit({ type: 'error', error: { message: j.error.message || 'AI error' } });
+            }
+          }
+        } catch (e) { emit({ type: 'error', error: { message: 'Connection lost. Try again.' } }); }
+        try { ctrl.close(); } catch (e) {}
+      }
+    });
+    return new Response(out, {
       status: 200,
       headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', 'X-Used': String(q.used), 'X-Limit': String(q.limit) }
     });
