@@ -76,9 +76,10 @@ pre code{display:block;padding:12px 14px;overflow-x:auto;font:13px/1.55 'JetBrai
 .fchip{background:var(--c3);border-radius:6px;padding:1px 4px 1px 9px;font-size:12px;display:flex;align-items:center;gap:4px}
 .fchip button{background:none;padding:0 5px}
 .tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
-.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg{display:flex;max-width:100%;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .seg button{border-radius:0;background:transparent;color:var(--mu);padding:5px 10px;font-size:13px}
 .seg button.on{background:var(--c4);color:var(--tx)}
+#modes{overflow-x:auto}
 select{background:var(--c0);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:13px}
 #send{margin-left:auto;background:var(--c4);padding:7px 18px}
 /* preview panel */
@@ -122,7 +123,7 @@ select{background:var(--c0);border:1px solid var(--line);border-radius:8px;paddi
    <div id="files"></div>
    <textarea id="in" rows="1" placeholder="Describe what you want to build"></textarea>
    <div class="tools">
-    <div class="seg" id="modes"><button data-m="website">Website</button><button data-m="app">App</button><button data-m="code">Code</button><button data-m="debug">Debug</button></div>
+    <div class="seg" id="modes"><button data-m="website">Website</button><button data-m="3d">3D</button><button data-m="admin">Admin</button><button data-m="clone">Clone</button><button data-m="app">App</button><button data-m="code">Code</button><button data-m="debug">Debug</button></div>
     <select id="model" aria-label="Model"><option value="fast">Fast</option><option value="balanced">Balanced</option><option value="max">Max</option></select>
     <button class="ghost" id="attach">Attach</button><input type="file" id="fileIn" multiple hidden accept="image/*,.txt,.md,.js,.ts,.jsx,.tsx,.json,.css,.html,.py,.sql,.csv,.java,.php,.go,.rs,.c,.cpp,.yml,.yaml,.xml,.sh">
     <button id="send">Send</button>
@@ -149,7 +150,7 @@ const configured=!SUPABASE_URL.startsWith('PASTE');
 const sb=configured?supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY):null;
 const S={user:null,chats:[],chatId:null,msgs:[],mode:'website',model:'balanced',busy:false,ctrl:null,files:[],used:null,limit:null,panelCode:''};
 const EXT={html:'html',css:'css',javascript:'js',js:'js',typescript:'ts',ts:'ts',tsx:'tsx',jsx:'jsx',python:'py',py:'py',json:'json',sql:'sql',bash:'sh',sh:'sh',java:'java',php:'php',go:'go',rust:'rs',c:'c',cpp:'cpp',markdown:'md',md:'md',yaml:'yml',xml:'xml',svg:'svg'};
-const SUGG={website:['A landing page for my clothing brand','A portfolio website with dark theme','A restaurant site with menu and booking form'],app:['A to-do app with login and reminders','An expense tracker with charts','A simple CRM for my small business'],code:['Write a function to validate Indian phone numbers','Explain async/await with a real example','Convert this code to TypeScript'],debug:['My button click does nothing, here is my code','I get a CORS error when calling my API','My page loads slowly, how do I find why?']};
+const SUGG={'3d':['Ultra-luxury perfume brand site with a rotating 3D bottle','Luxury watch landing page with 3D scroll animation','Dark red jewellery site with floating 3D particles'],admin:['Admin panel for my clothing store with products, orders and customers','Admin dashboard with login and sales charts','Simple inventory manager connected to Supabase'],clone:['I will attach a screenshot. Rebuild this layout with my own brand','Recreate this page layout in a dark red luxury style'],website:['A landing page for my clothing brand','A portfolio website with dark theme','A restaurant site with menu and booking form'],app:['A to-do app with login and reminders','An expense tracker with charts','A simple CRM for my small business'],code:['Write a function to validate Indian phone numbers','Explain async/await with a real example','Convert this code to TypeScript'],debug:['My button click does nothing, here is my code','I get a CORS error when calling my API','My page loads slowly, how do I find why?']};
 try{S.mode=localStorage.getItem('ef_mode')||S.mode;S.model=localStorage.getItem('ef_model')||S.model}catch{}
 marked.use({gfm:true});
 
@@ -336,7 +337,7 @@ async function run(){
   if(data)S.msgs[idx].id=data.id;
   sb.from('chats').update({updated_at:new Date().toISOString()}).eq('id',S.chatId).then(loadChats);
   const all=[...acc.matchAll(/```html\n([\s\S]*?)```/g)];
-  if(all.length&&S.mode==='website'&&!errText)openPanel(all[all.length-1][1]);
+  if(all.length&&['website','3d','admin','clone'].includes(S.mode)&&!errText)openPanel(all[all.length-1][1]);
  }else{S.msgs.pop();el.remove()}
  if(errText){const d=document.createElement('div');d.className='err';d.textContent=errText;$('#log').append(d);scrollDown();loadUsage()}
  setBusy(false);S.ctrl=null}
