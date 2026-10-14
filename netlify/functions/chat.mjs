@@ -77,7 +77,11 @@ export default async (req) => {
 
   const q = await rpc('consume_message', { p_user: user.id });
   if (q.allowed === undefined) return J(500, { error: 'Usage check failed. Did you run schema.sql?' });
-  if (!q.allowed) return J(429, { error: `Daily limit reached (${q.limit} messages). It resets at midnight IST.` });
+  if (!q.allowed) {
+    const h = Math.floor((q.reset || 0) / 3600), m = Math.ceil(((q.reset || 0) % 3600) / 60);
+    const wait = h > 0 ? `${h} h ${m} min` : `${Math.max(m, 1)} min`;
+    return J(429, { error: `Message limit reached (${q.limit} per 5 hours${q.busy ? ', lowered because many people are using Emberforge right now' : ''}). You can send again in about ${wait}.` });
+  }
 
   const base = (env('AI_BASE_URL') || 'https://generativelanguage.googleapis.com/v1beta/openai').replace(/\/$/, '');
   try {
@@ -131,7 +135,7 @@ export default async (req) => {
     });
     return new Response(out, {
       status: 200,
-      headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', 'X-Used': String(q.used), 'X-Limit': String(q.limit) }
+      headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', 'X-Used': String(q.used), 'X-Limit': String(q.limit), 'X-Reset': String(q.reset || 0), 'X-Busy': String(!!q.busy) }
     });
   } catch (e) {
     await rpc('refund_message', { p_user: user.id });
