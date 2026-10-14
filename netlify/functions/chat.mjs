@@ -81,17 +81,25 @@ export default async (req) => {
 
   const base = (env('AI_BASE_URL') || 'https://generativelanguage.googleapis.com/v1beta/openai').replace(/\/$/, '');
   try {
-    const up = await fetch(base + '/chat/completions', {
-      method: 'POST',
-      signal: req.signal,
-      headers: { 'content-type': 'application/json', Authorization: 'Bearer ' + env('GEMINI_API_KEY') },
-      body: JSON.stringify({ model: model.id, max_tokens: model.max, stream: true, messages: toOpenAI(system, messages) })
-    });
+    const candidates = [...new Set([model.id, 'gemini-flash-lite-latest', 'gemini-flash-latest'])];
+    let up, lastRaw = '';
+    for (let i = 0; i < candidates.length; i++) {
+      up = await fetch(base + '/chat/completions', {
+        method: 'POST',
+        signal: req.signal,
+        headers: { 'content-type': 'application/json', Authorization: 'Bearer ' + env('GEMINI_API_KEY') },
+        body: JSON.stringify({ model: candidates[i], max_tokens: model.max, stream: true, messages: toOpenAI(system, messages) })
+      });
+      if (up.ok) break;
+      lastRaw = await up.text();
+      // busy / overloaded: wait a moment and try the next model
+      if (![429, 500, 502, 503, 504].includes(up.status) || i === candidates.length - 1) break;
+      await new Promise(r => setTimeout(r, 800));
+    }
     if (!up.ok) {
       await rpc('refund_message', { p_user: user.id });
-      const raw = await up.text();
       let msg = 'AI service error. Try again.';
-      try { const e = JSON.parse(raw); const x = Array.isArray(e) ? e[0] : e; if (x && x.error && x.error.message) msg = x.error.message; } catch (e) {}
+      try { const e = JSON.parse(lastRaw); const x = Array.isArray(e) ? e[0] : e; if (x && x.error && x.error.message) msg = x.error.message; } catch (e) {}
       return J(502, { error: msg.slice(0, 300) });
     }
     const enc = new TextEncoder(), dec = new TextDecoder();
