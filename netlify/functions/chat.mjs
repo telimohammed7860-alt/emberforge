@@ -67,7 +67,7 @@ export default async (req) => {
   const messages = clean(body.messages);
   if (!messages) return J(400, { error: 'Invalid messages.' });
   const model = MODELS[body.model] || MODELS.balanced;
-  const system = SYSTEM;
+  const system = SYSTEM + (body.voice ? ' VOICE MODE: the user is talking to you by voice and your reply will be read aloud. Answer in short, natural spoken sentences, with no markdown, no lists and no code unless they explicitly ask for code.' : '');
 
   const q = await rpc('consume_message', { p_user: user.id });
   if (q.allowed === undefined) return J(500, { error: 'Usage check failed. Did you run schema.sql?' });
