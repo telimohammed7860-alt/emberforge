@@ -3,9 +3,10 @@ const env = (k) => (typeof Netlify !== 'undefined' ? Netlify.env.get(k) : proces
 const SB = (env('SUPABASE_URL') || '').replace(/\/$/, '');
 const KEY = env('SUPABASE_SERVICE_ROLE_KEY');
 const MODELS = {
-  fast: { id: env('AI_MODEL_FAST') || 'gemini-flash-lite-latest', max: 8000 },
-  balanced: { id: env('AI_MODEL_BALANCED') || 'gemini-flash-latest', max: 16000 },
-  max: { id: env('AI_MODEL_MAX') || 'gemini-flash-latest', max: 16000 }
+  fast: { id: env('AI_MODEL_FAST') || 'gemini-flash-lite-latest', max: 8000, label: 'Fast', premium: false },
+  balanced: { id: env('AI_MODEL_BALANCED') || 'gemini-flash-latest', max: 16000, label: 'Balanced', premium: false },
+  // Max is a paid (Pro) model. By default it uses the same Gemini key; set PREMIUM_API_KEY, PREMIUM_BASE_URL and PREMIUM_MODEL to use another provider.
+  max: { id: env('PREMIUM_MODEL') || 'gemini-pro-latest', max: 16000, label: 'Max', premium: true, base: env('PREMIUM_BASE_URL'), key: env('PREMIUM_API_KEY') }
 };
 function toOpenAI(system, messages) {
   const out = [{ role: 'system', content: system }];
@@ -69,23 +70,26 @@ export default async (req) => {
   const model = MODELS[body.model] || MODELS.balanced;
   const system = SYSTEM + (body.voice ? ' VOICE MODE: the user is talking to you by voice and your reply will be read aloud. Answer in short, natural spoken sentences, with no markdown, no lists and no code unless they explicitly ask for code.' : '');
 
-  const q = await rpc('consume_message', { p_user: user.id });
+  const q = await rpc('consume_message', { p_user: user.id, p_premium: !!model.premium });
   if (q.allowed === undefined) return J(500, { error: 'Usage check failed. Did you run schema.sql?' });
+  if (!q.allowed && q.reason === 'premium')
+    return J(403, { error: `${model.label} is a Pro model. Upgrade to Pro to use it, or switch to Fast or Balanced.` });
   if (!q.allowed) {
     const h = Math.floor((q.reset || 0) / 3600), m = Math.ceil(((q.reset || 0) % 3600) / 60);
     const wait = h > 0 ? `${h} h ${m} min` : `${Math.max(m, 1)} min`;
     return J(429, { error: `Message limit reached (${q.limit} per 5 hours${q.busy ? ', lowered because many people are using Emberforge right now' : ''}). You can send again in about ${wait}.` });
   }
 
-  const base = (env('AI_BASE_URL') || 'https://generativelanguage.googleapis.com/v1beta/openai').replace(/\/$/, '');
+  const base = (model.base || env('AI_BASE_URL') || 'https://generativelanguage.googleapis.com/v1beta/openai').replace(/\/$/, '');
+  const apiKey = model.key || env('GEMINI_API_KEY');
   try {
-    const candidates = [...new Set([model.id, 'gemini-flash-lite-latest', 'gemini-flash-latest'])];
+    const candidates = model.premium ? [model.id] : [...new Set([model.id, 'gemini-flash-lite-latest', 'gemini-flash-latest'])];
     let up, lastRaw = '';
     for (let i = 0; i < candidates.length; i++) {
       up = await fetch(base + '/chat/completions', {
         method: 'POST',
         signal: req.signal,
-        headers: { 'content-type': 'application/json', Authorization: 'Bearer ' + env('GEMINI_API_KEY') },
+        headers: { 'content-type': 'application/json', Authorization: 'Bearer ' + apiKey },
         body: JSON.stringify({ model: candidates[i], max_tokens: model.max, stream: true, messages: toOpenAI(system, messages) })
       });
       if (up.ok) break;
@@ -95,7 +99,7 @@ export default async (req) => {
       await new Promise(r => setTimeout(r, 800));
     }
     if (!up.ok) {
-      await rpc('refund_message', { p_user: user.id });
+      await rpc('refund_message', { p_user: user.id, p_premium: !!model.premium });
       let msg = 'AI service error. Try again.';
       try { const e = JSON.parse(lastRaw); const x = Array.isArray(e) ? e[0] : e; if (x && x.error && x.error.message) msg = x.error.message; } catch (e) {}
       return J(502, { error: msg.slice(0, 300) });
@@ -129,10 +133,10 @@ export default async (req) => {
     });
     return new Response(out, {
       status: 200,
-      headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', 'X-Used': String(q.used), 'X-Limit': String(q.limit), 'X-Reset': String(q.reset || 0), 'X-Busy': String(!!q.busy) }
+      headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', 'X-Used': String(q.used), 'X-Limit': String(q.limit), 'X-Reset': String(q.reset || 0), 'X-Busy': String(!!q.busy), 'X-Plan': String(q.plan || 'free'), 'X-Until': String(q.pro_until || '') }
     });
   } catch (e) {
-    await rpc('refund_message', { p_user: user.id });
+    await rpc('refund_message', { p_user: user.id, p_premium: !!model.premium });
     return J(500, { error: 'Something went wrong. Try again.' });
   }
 };
