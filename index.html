@@ -1,345 +1,140 @@
-<!DOCTYPE html>
-<html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Emberforge</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23660000'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%23e0452f'/%3E%3C/svg%3E">
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-<style>
-:root{--c0:#0a0403;--c1:#1d0c0a;--c2:#2b0000;--c3:#4a0000;--c4:#660000;--hot:#e0452f;--tx:#f3e6e3;--mu:#a98d88;--line:#3a1512}
-*{box-sizing:border-box}[hidden]{display:none!important}
-html,body{height:100%;margin:0}
-body{background:var(--c0);color:var(--tx);font:15px/1.65 'Instrument Sans',system-ui,sans-serif}
-button,input,select,textarea{font:inherit;color:inherit}
-button{cursor:pointer;border:0;background:var(--c3);border-radius:8px;padding:7px 12px}
-button:hover{background:var(--c4)}button:disabled{opacity:.5;cursor:default}
-:focus-visible{outline:2px solid var(--hot);outline-offset:2px}
-.ghost{background:transparent;color:var(--mu)}.ghost:hover{background:var(--c2);color:var(--tx)}
-.brand{font:700 21px 'Bricolage Grotesque',sans-serif;display:flex;gap:9px;align-items:center}
-.dot{width:12px;height:12px;border-radius:50%;background:var(--hot);box-shadow:0 0 14px var(--hot)}
-input.t{width:100%;background:var(--c0);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
-/* auth */
-.auth{min-height:100%;display:grid;place-items:center;padding:20px}
-.abox{width:min(380px,100%);background:var(--c1);border:1px solid var(--line);border-radius:16px;padding:28px;display:flex;flex-direction:column;gap:12px}
-.abox h1{font:700 26px 'Bricolage Grotesque',sans-serif;margin:8px 0 0}
-.abox p{margin:0;color:var(--mu)}
-.abox .main{background:var(--c4);padding:10px}
-.msgline{font-size:14px;color:var(--mu)}.msgline.bad{color:#ff8a78}
-/* layout */
-#app{display:flex;height:100dvh}
-#side{width:272px;flex-shrink:0;background:var(--c1);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:14px;gap:10px}
-#list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:2px;margin:0 -6px}
-.item{display:flex;align-items:center;gap:2px;padding:7px 8px;border-radius:8px;cursor:pointer;color:var(--mu)}
-.item:hover,.item.on{background:var(--c2);color:var(--tx)}
-.item span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.item button{display:none;padding:2px 7px;background:none;color:var(--mu)}
-.item:hover button,.item:focus-within button{display:inline-block}
-.sfoot{border-top:1px solid var(--line);padding-top:10px;font-size:13px;color:var(--mu);display:flex;flex-direction:column;gap:6px}
-#who{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#main{flex:1;min-width:0;display:flex;flex-direction:column}
-.top{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line)}
-#menu{display:none}
-#title{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#scroll{flex:1;overflow-y:auto;padding:22px 16px}
-.col{max-width:760px;margin:0 auto}
-.empty{margin-top:9vh}
-.empty h1{font:700 40px/1.15 'Bricolage Grotesque',sans-serif;margin:0 0 6px}
-.empty p{color:var(--mu);margin:0 0 18px}
-.sug{display:block;width:100%;text-align:left;background:none;border-bottom:1px solid var(--line);border-radius:0;padding:11px 2px;color:var(--tx)}
-.sug:hover{background:var(--c1)}
-.msg{margin-bottom:26px}
-.msg.user .body{background:var(--c2);border-radius:14px;padding:10px 14px;white-space:pre-wrap;margin-left:auto;width:fit-content;max-width:92%;overflow-wrap:anywhere}
-.chip{display:inline-block;background:var(--c4);border-radius:6px;padding:0 8px;font-size:12px;margin:6px 6px 0 0}
-.body{overflow-wrap:anywhere}
-.body p{margin:0 0 11px}.body h1,.body h2,.body h3{font-family:'Bricolage Grotesque',sans-serif;line-height:1.25;margin:18px 0 8px}
-.body ul,.body ol{padding-left:22px;margin:0 0 11px}.body a{color:#ff9a88}
-.body table{border-collapse:collapse;display:block;overflow-x:auto}.body td,.body th{border:1px solid var(--line);padding:5px 10px}
-.body :not(pre)>code{font:13px 'JetBrains Mono',monospace;background:var(--c2);padding:1px 5px;border-radius:5px}
-.body blockquote{margin:0 0 11px;padding-left:12px;border-left:3px solid var(--c4);color:var(--mu)}
-pre{background:#120706;border:1px solid var(--line);border-radius:10px;margin:12px 0;overflow:hidden}
-pre code{display:block;padding:12px 14px;overflow-x:auto;font:13px/1.55 'JetBrains Mono',monospace;background:transparent!important}
-.bar{display:flex;gap:6px;align-items:center;padding:5px 8px 5px 12px;background:var(--c2);font-size:12px;color:var(--mu)}
-.bar span{margin-right:auto}.bar button{padding:3px 9px;font-size:12px}
-.acts{display:flex;gap:6px;margin-top:4px}.acts button{font-size:12px;padding:3px 9px}
-.think{color:var(--mu)}.think:after{content:'';animation:d 1.2s steps(4) infinite}
-@keyframes d{0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'}}
-.err{background:#3a0b08;border:1px solid var(--c4);border-radius:10px;padding:10px 14px;margin-bottom:20px}
-.composer{padding:8px 16px 16px}
-.box{max-width:760px;margin:0 auto;background:var(--c1);border:1px solid var(--line);border-radius:16px;padding:10px}
-.box:focus-within{border-color:var(--hot)}
-#in{width:100%;background:transparent;border:0;outline:0;resize:none;max-height:200px;padding:4px 6px;display:block}
-#files{display:flex;flex-wrap:wrap;gap:6px;padding:0 4px}
-.fchip{background:var(--c3);border-radius:6px;padding:1px 4px 1px 9px;font-size:12px;display:flex;align-items:center;gap:4px}
-.fchip button{background:none;padding:0 5px}
-.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
-.seg{display:flex;max-width:100%;border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.seg button{border-radius:0;background:transparent;color:var(--mu);padding:5px 10px;font-size:13px}
-.seg button.on{background:var(--c4);color:var(--tx)}
-#modes{overflow-x:auto}
-select{background:var(--c0);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:13px}
-#send{margin-left:auto;background:var(--c4);padding:7px 18px}
-/* preview panel */
-#panel{width:50%;max-width:840px;flex-shrink:0;border-left:1px solid var(--line);display:flex;flex-direction:column}
-.ph{display:flex;gap:6px;align-items:center;padding:8px;border-bottom:1px solid var(--line);background:var(--c1)}
-.ph .sp{flex:1}
-.fw{flex:1;overflow:auto;display:flex;justify-content:center;background:#140807}
-#frame{border:0;background:#fff;width:100%;height:100%}
-#codeView{margin:0;flex:1;overflow:auto;padding:14px;font:13px/1.55 'JetBrains Mono',monospace;white-space:pre;background:#120706}
-#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--c4);padding:9px 16px;border-radius:10px;z-index:50}
-@media(max-width:900px){
- #side{position:fixed;inset:0 auto 0 0;z-index:20;transform:translateX(-100%);transition:transform .2s}
- #side.open{transform:none}#menu{display:inline-block}
- #panel{position:fixed;inset:0;width:100%;max-width:none;z-index:30;background:var(--c0)}
+// Emberforge backend for Netlify (Functions v2, streaming). Verifies login, enforces the daily limit, streams the AI reply (Gemini via its OpenAI-compatible API).
+const env = (k) => (typeof Netlify !== 'undefined' ? Netlify.env.get(k) : process.env[k]);
+const SB = (env('SUPABASE_URL') || '').replace(/\/$/, '');
+const KEY = env('SUPABASE_SERVICE_ROLE_KEY');
+const MODELS = {
+  fast: { id: env('AI_MODEL_FAST') || 'gemini-flash-lite-latest', max: 8000 },
+  balanced: { id: env('AI_MODEL_BALANCED') || 'gemini-flash-latest', max: 16000 },
+  max: { id: env('AI_MODEL_MAX') || 'gemini-flash-latest', max: 16000 }
+};
+function toOpenAI(system, messages) {
+  const out = [{ role: 'system', content: system }];
+  for (const m of messages) {
+    if (typeof m.content === 'string') out.push({ role: m.role, content: m.content });
+    else out.push({ role: m.role, content: m.content.map(b => b.type === 'text'
+      ? { type: 'text', text: b.text }
+      : { type: 'image_url', image_url: { url: `data:${b.source.media_type};base64,${b.source.data}` } }) });
+  }
+  return out;
 }
-@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
-</style></head><body>
-
-<div id="auth" class="auth" hidden><form id="authForm" class="abox">
- <div class="brand"><i class="dot"></i>Emberforge</div>
- <h1 id="aTitle">Sign in</h1><p>Build websites, apps and serious code with AI.</p>
- <input class="t" id="email" type="email" placeholder="Email" autocomplete="email" required>
- <input class="t" id="pass" type="password" placeholder="Password (min 6 characters)" minlength="6" autocomplete="current-password" required>
- <button class="main" id="aGo">Sign in</button>
- <button type="button" class="ghost" id="aSwap">New here? Create an account</button>
- <div id="aMsg" class="msgline"></div>
-</form></div>
-
-<div id="app" hidden>
- <aside id="side">
-  <div class="brand"><i class="dot"></i>Emberforge</div>
-  <button id="newChat">New chat</button>
-  <input class="t" id="search" placeholder="Search chats">
-  <nav id="list"></nav>
-  <div class="sfoot"><div id="usage"></div><div id="who"></div><button class="ghost" id="out">Sign out</button></div>
- </aside>
- <section id="main">
-  <div class="top"><button class="ghost" id="menu" aria-label="Open chats">Chats</button><div id="title">New chat</div></div>
-  <div id="scroll"><div class="col" id="log"></div></div>
-  <div class="composer"><div class="box">
-   <div id="files"></div>
-   <textarea id="in" rows="1" placeholder="Describe what you want to build"></textarea>
-   <div class="tools">
-    <div class="seg" id="modes"><button data-m="website">Website</button><button data-m="3d">3D</button><button data-m="admin">Admin</button><button data-m="clone">Clone</button><button data-m="app">App</button><button data-m="code">Code</button><button data-m="debug">Debug</button></div>
-    <select id="model" aria-label="Model"><option value="fast">Fast</option><option value="balanced">Balanced</option><option value="max">Max</option></select>
-    <button class="ghost" id="attach">Attach</button><input type="file" id="fileIn" multiple hidden accept="image/*,.txt,.md,.js,.ts,.jsx,.tsx,.json,.css,.html,.py,.sql,.csv,.java,.php,.go,.rs,.c,.cpp,.yml,.yaml,.xml,.sh">
-    <button id="send">Send</button>
-   </div>
-  </div></div>
- </section>
- <section id="panel" hidden>
-  <div class="ph">
-   <div class="seg" id="ptabs"><button data-t="pv" class="on">Preview</button><button data-t="code">Code</button></div>
-   <div class="seg" id="pdev"><button data-w="100%" class="on">Desktop</button><button data-w="390px">Mobile</button></div>
-   <span class="sp"></span><button id="pdl">Download</button><button class="ghost" id="pclose">Close</button>
-  </div>
-  <div class="fw" id="fw"><iframe id="frame" title="Preview" sandbox="allow-scripts allow-forms allow-modals allow-popups"></iframe></div>
-  <pre id="codeView" hidden></pre>
- </section>
-</div>
-<div id="toast" hidden></div>
-
-<script>
-const SUPABASE_URL='https://geoqgqqytsvoswqhgker.supabase.co';
-const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlb3FncXF5dHN2b3N3cWhna2VyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyODI3OTQsImV4cCI6MjA5Nzg1ODc5NH0.0R14m-uR4oavqFiNg_zxHwNjYSZwX2VKqX2SoRGOV04';
-const $=s=>document.querySelector(s);
-const configured=!SUPABASE_URL.startsWith('PASTE');
-const sb=configured?supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY):null;
-const S={user:null,chats:[],chatId:null,msgs:[],mode:'website',model:'balanced',busy:false,ctrl:null,files:[],used:null,limit:null,panelCode:''};
-const EXT={html:'html',css:'css',javascript:'js',js:'js',typescript:'ts',ts:'ts',tsx:'tsx',jsx:'jsx',python:'py',py:'py',json:'json',sql:'sql',bash:'sh',sh:'sh',java:'java',php:'php',go:'go',rust:'rs',c:'c',cpp:'cpp',markdown:'md',md:'md',yaml:'yml',xml:'xml',svg:'svg'};
-const SUGG={'3d':['Ultra-luxury perfume brand site with a rotating 3D bottle','Luxury watch landing page with 3D scroll animation','Dark red jewellery site with floating 3D particles'],admin:['Admin panel for my clothing store with products, orders and customers','Admin dashboard with login and sales charts','Simple inventory manager connected to Supabase'],clone:['I will attach a screenshot. Rebuild this layout with my own brand','Recreate this page layout in a dark red luxury style'],website:['A landing page for my clothing brand','A portfolio website with dark theme','A restaurant site with menu and booking form'],app:['A to-do app with login and reminders','An expense tracker with charts','A simple CRM for my small business'],code:['Write a function to validate Indian phone numbers','Explain async/await with a real example','Convert this code to TypeScript'],debug:['My button click does nothing, here is my code','I get a CORS error when calling my API','My page loads slowly, how do I find why?']};
-try{S.mode=localStorage.getItem('ef_mode')||S.mode;S.model=localStorage.getItem('ef_model')||S.model}catch{}
-marked.use({gfm:true});
-
-function toast(t){const e=$('#toast');e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,3500)}
-const token=async()=>(await sb.auth.getSession()).data.session.access_token;
-const scrollDown=()=>{const s=$('#scroll');s.scrollTop=s.scrollHeight};
-
-/* ---------- auth ---------- */
-let signup=false;
-function authUI(){$('#aTitle').textContent=signup?'Create account':'Sign in';$('#aGo').textContent=signup?'Create account':'Sign in';$('#aSwap').textContent=signup?'Already have an account? Sign in':'New here? Create an account';$('#pass').autocomplete=signup?'new-password':'current-password'}
-function aMsg(t,bad){const e=$('#aMsg');e.textContent=t;e.className='msgline'+(bad?' bad':'')}
-function showAuth(){$('#app').hidden=true;$('#auth').hidden=false;if(!configured)aMsg('Setup needed: paste your Supabase URL and anon key at the top of the script in index.html.',true)}
-$('#aSwap').onclick=()=>{signup=!signup;authUI();aMsg('')};
-$('#authForm').onsubmit=async e=>{e.preventDefault();if(!configured)return showAuth();
- const email=$('#email').value.trim(),password=$('#pass').value;$('#aGo').disabled=true;aMsg('');
- try{
-  if(signup){const{data,error}=await sb.auth.signUp({email,password});if(error)throw error;
-   if(!data.session){aMsg('Account created. Check your email to confirm, then sign in.');signup=false;authUI()}}
-  else{const{error}=await sb.auth.signInWithPassword({email,password});if(error)throw error}
- }catch(err){aMsg(err.message,true)}
- $('#aGo').disabled=false};
-$('#out').onclick=()=>sb.auth.signOut();
-if(configured){sb.auth.onAuthStateChange((_e,session)=>{
- if(session){if(!S.user||S.user.id!==session.user.id){S.user=session.user;setTimeout(boot,0)}}
- else{S.user=null;S.chats=[];S.msgs=[];showAuth()}})}
-else showAuth();
-
-async function boot(){
- $('#auth').hidden=true;$('#app').hidden=false;$('#who').textContent=S.user.email;
- setMode(S.mode);$('#model').value=S.model;
- await loadChats();loadUsage();newChat();
+const SYSTEM = "You are Emberforge, a friendly and capable AI assistant, like a general-purpose chat assistant, that is also especially strong at building websites, apps, 3D sites, admin panels and code.\n\nHOW TO RESPOND (most important):\n1. Read the user's latest message carefully, together with the conversation so far, and answer exactly what they asked.\n2. Reply in the same language the user writes in (Hindi, Hinglish, English, Gujarati, Arabic, French or any other). Keep explanations simple and direct.\n3. Greetings, small talk, questions, explanations, advice and translations get a natural plain-text reply. Do NOT write code or build a website unless the user clearly asks you to build, create, make, write or fix something.\n4. If the user does ask you to build something, build it, making sensible assumptions for missing details instead of asking many questions. If you really cannot tell what they want, ask ONE short question first.\n5. Keep the reply as short as the question deserves. Never repeat the user's message back.\n\nWHEN THE USER ASKS YOU TO BUILD SOMETHING, follow the matching rules below. Always write complete working code, never placeholders like 'rest of the code here'.\n\nWEBSITES AND DESIGN: output ONE complete, self-contained, responsive HTML file (inline CSS and JS) in a single ```html block, then 2-4 short lines on how to customise it. Default to an ultra-luxury standard: restrained palette (deep black with rich red or gold accents), generous whitespace, an elegant serif display font with a refined sans (Google Fonts, e.g. Cormorant Garamond or Playfair Display with Jost or Inter), hairline borders, slow smooth motion (CSS transitions, IntersectionObserver reveals), refined hover effects, prefers-reduced-motion respected, accessible. Do not rely on external image links (they break): use CSS gradients, inline SVG or data URIs. Write real-sounding copy, never lorem ipsum. For several languages add a language switcher with all text in a JS dictionary.\n\n3D: load Three.js with <script src=\"https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js\"></script> (no ES module imports); build an elegant scene from geometry (rotating product-like shape, floating particles, soft lights), mouse parallax and scroll-driven camera, pixel ratio capped at 2, handle resize, requestAnimationFrame, graceful fallback without WebGL; keep the code compact so it finishes.\n\nADMIN PANELS WITH SUPABASE: one HTML file using supabase-js v2 from <script src=\"https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js\"></script>, with const SUPABASE_URL and const SUPABASE_ANON_KEY placeholders at the top. NEVER put a service_role key in the browser. Include email/password login, sidebar, CRUD tables with search and pagination, confirmation before delete, clear errors, and wrap localStorage in try/catch because the preview is sandboxed. Then give a separate ```sql block (tables, indexes, Row Level Security so only users listed in an admin_users table can write) and numbered setup steps.\n\nRECREATING A WEBSITE LAYOUT: when the user shows a screenshot, pasted HTML or description, rebuild the structure, sections, spacing, typography style and interactions as fresh original code with placeholder text and CSS/SVG visuals. Do NOT copy proprietary text, logos, trademarks or images, and do NOT recreate login, payment or banking pages of real brands (that enables phishing). Tell the user in one line to replace content and branding with their own. If given only a link, say you cannot open links and ask for a screenshot or the page HTML.\n\nAPPS AND CODE: for small apps prefer a single HTML file; for bigger ones put each file in its own fenced block with the file path as a comment on the first line, then numbered setup steps. For bugs, state the root cause in one or two sentences, give the minimal fix as a code block, then how to verify it.";
+const J = (code, obj, extra) => new Response(JSON.stringify(obj), { status: code, headers: { 'Content-Type': 'application/json', ...(extra || {}) } });
+async function getUser(token) {
+  const r = await fetch(SB + '/auth/v1/user', { headers: { apikey: KEY, Authorization: 'Bearer ' + token } });
+  return r.ok ? r.json() : null;
 }
+async function rpc(name, args) {
+  const r = await fetch(SB + '/rest/v1/rpc/' + name, {
+    method: 'POST',
+    headers: { apikey: KEY, Authorization: 'Bearer ' + KEY, 'content-type': 'application/json' },
+    body: JSON.stringify(args)
+  });
+  return r.json().catch(() => ({}));
+}
+function clean(messages) {
+  if (!Array.isArray(messages)) return null;
+  const out = [];
+  for (const m of messages.slice(-30)) {
+    if (!m || (m.role !== 'user' && m.role !== 'assistant')) return null;
+    if (typeof m.content === 'string') {
+      if (m.content.trim()) out.push({ role: m.role, content: m.content.slice(0, 200000) });
+    } else if (Array.isArray(m.content) && m.role === 'user') {
+      const blocks = [];
+      for (const b of m.content) {
+        if (b && b.type === 'text' && typeof b.text === 'string') blocks.push({ type: 'text', text: b.text.slice(0, 200000) });
+        else if (b && b.type === 'image' && b.source && b.source.type === 'base64' &&
+          /^image\/(png|jpeg|gif|webp)$/.test(b.source.media_type) && typeof b.source.data === 'string')
+          blocks.push({ type: 'image', source: { type: 'base64', media_type: b.source.media_type, data: b.source.data } });
+      }
+      if (blocks.length) out.push({ role: 'user', content: blocks });
+    } else return null;
+  }
+  while (out.length && out[0].role !== 'user') out.shift();
+  return out.length && out[out.length - 1].role === 'user' ? out : null;
+}
+export default async (req) => {
+  if (!SB || !KEY || !env('GEMINI_API_KEY'))
+    return J(500, { error: 'Server is not set up yet. Add the 3 environment variables (GEMINI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) in Netlify and redeploy.' });
+  const token = (req.headers.get('authorization') || '').replace(/^Bearer /, '');
+  if (!token) return J(401, { error: 'Please sign in.' });
+  const user = await getUser(token);
+  if (!user || !user.id) return J(401, { error: 'Session expired. Please sign in again.' });
+  if (req.method === 'GET') return J(200, await rpc('get_usage', { p_user: user.id }));
+  if (req.method !== 'POST') return J(405, { error: 'Method not allowed' });
 
-/* ---------- usage ---------- */
-function setUsage(used,limit,reset,busy){S.used=+used;S.limit=+limit;
- const fmt=r=>{r=+r||0;const h=Math.floor(r/3600),m=Math.ceil((r%3600)/60);return h>0?h+' h '+m+' min':Math.max(m,1)+' min'};
- let t;if(S.limit>=10000)t='Unlimited messages';
- else{t=Math.max(S.limit-S.used,0)+' of '+S.limit+' messages left';if(+reset>0)t+=' (resets in '+fmt(reset)+')';if(busy===true||busy==='true')t+='. High demand right now, limits are lowered.'}
- $('#usage').textContent=t}
-async function loadUsage(){try{const r=await fetch('/api/chat',{headers:{Authorization:'Bearer '+await token()}});if(r.ok){const j=await r.json();setUsage(j.used,j.limit,j.reset,j.busy)}}catch{}}
+  let body = {};
+  try { body = await req.json(); } catch (e) {}
+  const messages = clean(body.messages);
+  if (!messages) return J(400, { error: 'Invalid messages.' });
+  const model = MODELS[body.model] || MODELS.balanced;
+  const system = SYSTEM + (body.voice ? ' VOICE MODE: the user is talking to you by voice and your reply will be read aloud. Answer in short, natural spoken sentences, with no markdown, no lists and no code unless they explicitly ask for code.' : '');
 
-/* ---------- chats ---------- */
-async function loadChats(){const{data,error}=await sb.from('chats').select('id,title,mode,updated_at').order('updated_at',{ascending:false});
- if(error)return toast(error.message);S.chats=data;renderList()}
-function renderList(){const q=$('#search').value.toLowerCase(),L=$('#list');L.innerHTML='';
- S.chats.filter(c=>c.title.toLowerCase().includes(q)).forEach(c=>{
-  const d=document.createElement('div');d.className='item'+(c.id===S.chatId?' on':'');d.tabIndex=0;
-  const s=document.createElement('span');s.textContent=c.title;d.append(s);
-  const r=document.createElement('button');r.textContent='Rename';r.dataset.a='ren';
-  const x=document.createElement('button');x.textContent='Delete';x.dataset.a='del';
-  d.append(r,x);
-  d.onclick=async e=>{const a=e.target.dataset.a;
-   if(a==='ren'){const t=prompt('Rename chat',c.title);if(t&&t.trim()){await sb.from('chats').update({title:t.trim().slice(0,80)}).eq('id',c.id);if(c.id===S.chatId)$('#title').textContent=t.trim();loadChats()}}
-   else if(a==='del'){if(confirm('Delete this chat?')){await sb.from('chats').delete().eq('id',c.id);if(c.id===S.chatId)newChat();loadChats()}}
-   else openChat(c.id)};
-  d.onkeydown=e=>{if(e.key==='Enter'&&e.target===d)openChat(c.id)};
-  L.append(d)})}
-$('#search').oninput=renderList;
-async function openChat(id){if(S.busy)return;
- const{data,error}=await sb.from('messages').select('id,role,content').eq('chat_id',id).order('created_at');
- if(error)return toast(error.message);
- S.chatId=id;S.msgs=data;$('#title').textContent=(S.chats.find(c=>c.id===id)||{}).title||'Chat';
- $('#side').classList.remove('open');render();renderList()}
-function newChat(){if(S.busy)return;S.chatId=null;S.msgs=[];$('#title').textContent='New chat';render();renderList();$('#side').classList.remove('open');$('#in').focus()}
-$('#newChat').onclick=newChat;
-$('#menu').onclick=()=>$('#side').classList.toggle('open');
+  const q = await rpc('consume_message', { p_user: user.id });
+  if (q.allowed === undefined) return J(500, { error: 'Usage check failed. Did you run schema.sql?' });
+  if (!q.allowed) {
+    const h = Math.floor((q.reset || 0) / 3600), m = Math.ceil(((q.reset || 0) % 3600) / 60);
+    const wait = h > 0 ? `${h} h ${m} min` : `${Math.max(m, 1)} min`;
+    return J(429, { error: `Message limit reached (${q.limit} per 5 hours${q.busy ? ', lowered because many people are using Emberforge right now' : ''}). You can send again in about ${wait}.` });
+  }
 
-/* ---------- rendering ---------- */
-function md(t,final){
- const d=document.createElement('div');d.innerHTML=DOMPurify.sanitize(marked.parse(t));
- d.querySelectorAll('pre').forEach(pre=>{const code=pre.querySelector('code');if(!code)return;
-  const m=/language-([\w-]+)/.exec(code.className);const lang=m?m[1].toLowerCase():'text';
-  if(final&&lang!=='text'&&window.hljs){try{hljs.highlightElement(code)}catch{}}
-  const bar=document.createElement('div');bar.className='bar';const sp=document.createElement('span');sp.textContent=lang;bar.append(sp);
-  const add=(a,l)=>{const b=document.createElement('button');b.dataset.act=a;b.textContent=l;bar.append(b)};
-  if(lang==='html')add('preview','Preview');add('dl','Download');add('copy','Copy');
-  pre.prepend(bar);pre.dataset.lang=lang});
- return d.innerHTML}
-function userBody(el,content){
- const re=/\n\n\[File: ([^\]\n]+)\]\n````\n[\s\S]*?\n````/g,names=[];
- const text=content.replace(re,(_,n)=>{names.push(n);return''});
- el.textContent=text;names.forEach(n=>{const c=document.createElement('span');c.className='chip';c.textContent=n;el.append(c)})}
-function addMsg(i){
- const m=S.msgs[i],el=document.createElement('div');el.className='msg '+m.role;el.dataset.i=i;
- const body=document.createElement('div');body.className='body';el.append(body);
- if(m.role==='user')userBody(body,m.content);
- else{if(m.content)body.innerHTML=md(m.content,true);
-  const a=document.createElement('div');a.className='acts';
-  a.innerHTML='<button class="ghost" data-act="copy">Copy</button><button class="ghost regen" data-act="regen">Regenerate</button>';el.append(a)}
- $('#log').append(el);return el}
-function fixRegen(){const r=[...document.querySelectorAll('.regen')];r.forEach((b,k)=>b.hidden=k!==r.length-1)}
-function render(){const L=$('#log');L.innerHTML='';
- if(!S.msgs.length){const e=document.createElement('div');e.className='empty';
-  e.innerHTML='<h1>What are we building?</h1><p>Pick a mode below, then describe it in Hindi, Hinglish or English.</p>';
-  SUGG[S.mode].forEach(t=>{const b=document.createElement('button');b.className='sug';b.textContent=t;b.onclick=()=>{$('#in').value=t;send()};e.append(b)});
-  L.append(e);return}
- S.msgs.forEach((_,i)=>addMsg(i));fixRegen();scrollDown()}
-$('#log').onclick=e=>{const b=e.target.closest('button[data-act]');if(!b)return;const act=b.dataset.act,pre=b.closest('pre');
- if(pre){const code=pre.querySelector('code').textContent;
-  if(act==='copy')copy(code,b);else if(act==='dl')download(code,pre.dataset.lang);else if(act==='preview')openPanel(code)}
- else if(act==='copy')copy(S.msgs[+b.closest('.msg').dataset.i].content,b);
- else if(act==='regen')regen()};
-function copy(t,b){navigator.clipboard.writeText(t).then(()=>{const o=b.textContent;b.textContent='Copied';setTimeout(()=>b.textContent=o,1200)},()=>toast('Copy not allowed here'))}
-function download(code,lang){const name=lang==='html'?'index.html':'code.'+(EXT[lang]||'txt');
- const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([code],{type:'text/plain'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)}
+  const base = (env('AI_BASE_URL') || 'https://generativelanguage.googleapis.com/v1beta/openai').replace(/\/$/, '');
+  try {
+    const candidates = [...new Set([model.id, 'gemini-flash-lite-latest', 'gemini-flash-latest'])];
+    let up, lastRaw = '';
+    for (let i = 0; i < candidates.length; i++) {
+      up = await fetch(base + '/chat/completions', {
+        method: 'POST',
+        signal: req.signal,
+        headers: { 'content-type': 'application/json', Authorization: 'Bearer ' + env('GEMINI_API_KEY') },
+        body: JSON.stringify({ model: candidates[i], max_tokens: model.max, stream: true, messages: toOpenAI(system, messages) })
+      });
+      if (up.ok) break;
+      lastRaw = await up.text();
+      // busy / overloaded: wait a moment and try the next model
+      if (![429, 500, 502, 503, 504].includes(up.status) || i === candidates.length - 1) break;
+      await new Promise(r => setTimeout(r, 800));
+    }
+    if (!up.ok) {
+      await rpc('refund_message', { p_user: user.id });
+      let msg = 'AI service error. Try again.';
+      try { const e = JSON.parse(lastRaw); const x = Array.isArray(e) ? e[0] : e; if (x && x.error && x.error.message) msg = x.error.message; } catch (e) {}
+      return J(502, { error: msg.slice(0, 300) });
+    }
+    const enc = new TextEncoder(), dec = new TextDecoder();
+    const out = new ReadableStream({
+      async start(ctrl) {
+        const emit = (o) => { try { ctrl.enqueue(enc.encode('data: ' + JSON.stringify(o) + '\n\n')); } catch (e) {} };
+        const rd = up.body.getReader();
+        let buf = '';
+        try {
+          for (;;) {
+            const { done, value } = await rd.read();
+            if (done) break;
+            buf += dec.decode(value, { stream: true });
+            const lines = buf.split('\n');
+            buf = lines.pop();
+            for (const l of lines) {
+              if (!l.startsWith('data:')) continue;
+              const d = l.slice(5).trim();
+              if (!d || d === '[DONE]') continue;
+              let j; try { j = JSON.parse(d); } catch (e) { continue; }
+              const t = j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content;
+              if (t) emit({ type: 'content_block_delta', delta: { type: 'text_delta', text: t } });
+              else if (j.error) emit({ type: 'error', error: { message: j.error.message || 'AI error' } });
+            }
+          }
+        } catch (e) { emit({ type: 'error', error: { message: 'Connection lost. Try again.' } }); }
+        try { ctrl.close(); } catch (e) {}
+      }
+    });
+    return new Response(out, {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', 'X-Used': String(q.used), 'X-Limit': String(q.limit), 'X-Reset': String(q.reset || 0), 'X-Busy': String(!!q.busy) }
+    });
+  } catch (e) {
+    await rpc('refund_message', { p_user: user.id });
+    return J(500, { error: 'Something went wrong. Try again.' });
+  }
+};
 
-/* ---------- preview panel ---------- */
-function openPanel(code){S.panelCode=code;$('#frame').srcdoc=code;$('#codeView').textContent=code;$('#panel').hidden=false;setTab('pv')}
-function setTab(t){$('#frame').parentElement.hidden=t!=='pv';$('#pdev').hidden=t!=='pv';$('#codeView').hidden=t!=='code';
- document.querySelectorAll('#ptabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===t))}
-$('#ptabs').onclick=e=>{if(e.target.dataset.t)setTab(e.target.dataset.t)};
-$('#pdev').onclick=e=>{const w=e.target.dataset.w;if(!w)return;$('#frame').style.width=w;document.querySelectorAll('#pdev button').forEach(b=>b.classList.toggle('on',b===e.target))};
-$('#pdl').onclick=()=>download(S.panelCode,'html');
-$('#pclose').onclick=()=>$('#panel').hidden=true;
-document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#panel').hidden=true});
-
-/* ---------- controls ---------- */
-function setMode(m){S.mode=m;document.querySelectorAll('#modes button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));try{localStorage.setItem('ef_mode',m)}catch{}
- if(!S.msgs.length&&S.user)render()}
-$('#modes').onclick=e=>{if(e.target.dataset.m)setMode(e.target.dataset.m)};
-$('#model').onchange=e=>{S.model=e.target.value;try{localStorage.setItem('ef_model',S.model)}catch{}};
-const ta=$('#in');
-ta.oninput=()=>{ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,200)+'px'};
-ta.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();send()}};
-$('#send').onclick=()=>S.busy?S.ctrl&&S.ctrl.abort():send();
-$('#attach').onclick=()=>$('#fileIn').click();
-$('#fileIn').onchange=async e=>{
- for(const f of e.target.files){
-  const total=S.files.reduce((n,x)=>n+x.size,0)+f.size;
-  if(S.files.length>=5||f.size>2e6||total>3e6){toast('Skipped '+f.name+' (max 5 files, 3 MB total)');continue}
-  if(f.type.startsWith('image/')){
-   if(!/^image\/(png|jpeg|gif|webp)$/.test(f.type)){toast('Unsupported image type');continue}
-   const data=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result.split(',')[1]);fr.readAsDataURL(f)});
-   S.files.push({name:f.name,type:'image',mime:f.type,data,size:f.size})}
-  else S.files.push({name:f.name,type:'text',data:await f.text(),size:f.size})}
- e.target.value='';renderFiles()};
-function renderFiles(){const F=$('#files');F.innerHTML='';S.files.forEach((f,i)=>{const c=document.createElement('span');c.className='fchip';c.textContent=f.name;
- const x=document.createElement('button');x.textContent='x';x.setAttribute('aria-label','Remove '+f.name);x.onclick=()=>{S.files.splice(i,1);renderFiles()};c.append(x);F.append(c)})}
-function setBusy(b){S.busy=b;$('#send').textContent=b?'Stop':'Send'}
-
-/* ---------- sending ---------- */
-async function send(){
- if(S.busy)return;const text=ta.value.trim();if(!text&&!S.files.length)return;
- let shown=text;const blocks=[];
- for(const f of S.files){
-  if(f.type==='image'){blocks.push({type:'image',source:{type:'base64',media_type:f.mime,data:f.data}});shown+=(shown?'\n\n':'')+'[Image attached: '+f.name+']'}
-  else shown+='\n\n[File: '+f.name+']\n````\n'+f.data+'\n````'}
- if(!S.chatId){
-  const{data,error}=await sb.from('chats').insert({title:(text||S.files[0].name).slice(0,48),mode:S.mode}).select('id').single();
-  if(error)return toast(error.message);
-  S.chatId=data.id;$('#title').textContent=(text||S.files[0].name).slice(0,48)}
- const m={role:'user',content:shown};if(blocks.length)m.api=[...blocks,{type:'text',text:shown}];
- if(!S.msgs.length)$('#log').innerHTML='';
- S.msgs.push(m);addMsg(S.msgs.length-1);
- ta.value='';ta.style.height='auto';S.files=[];renderFiles();scrollDown();
- sb.from('messages').insert({chat_id:S.chatId,role:'user',content:shown}).select('id').single().then(r=>{if(r.data)m.id=r.data.id});
- await run()}
-async function regen(){
- if(S.busy)return;const last=S.msgs[S.msgs.length-1];if(!last||last.role!=='assistant')return;
- if(last.id)await sb.from('messages').delete().eq('id',last.id);
- S.msgs.pop();$('#log').lastElementChild.remove();await run()}
-async function run(){
- setBusy(true);const idx=S.msgs.length;S.msgs.push({role:'assistant',content:''});
- const el=addMsg(idx),body=el.querySelector('.body');body.innerHTML='<span class="think">Forging</span>';el.querySelector('.acts').hidden=true;
- const payload=S.msgs.slice(0,-1).slice(-30).map(m=>({role:m.role,content:m.api||m.content}));
- S.ctrl=new AbortController();let acc='',raf=0,errText='';
- const paint=()=>{raf=0;body.innerHTML=md(acc,false);scrollDown()};
- try{
-  const res=await fetch('/api/chat',{method:'POST',signal:S.ctrl.signal,headers:{'Content-Type':'application/json',Authorization:'Bearer '+await token()},body:JSON.stringify({messages:payload,mode:S.mode,model:S.model})});
-  if(!res.ok){const j=await res.json().catch(()=>({}));throw new Error(j.error||'Error '+res.status)}
-  setUsage(res.headers.get('X-Used'),res.headers.get('X-Limit'),res.headers.get('X-Reset'),res.headers.get('X-Busy'));
-  const rd=res.body.getReader(),dec=new TextDecoder();let buf='';
-  for(;;){const{done,value}=await rd.read();if(done)break;
-   buf+=dec.decode(value,{stream:true});const parts=buf.split('\n\n');buf=parts.pop();
-   for(const p of parts){const line=p.split('\n').find(l=>l.startsWith('data:'));if(!line)continue;
-    let ev;try{ev=JSON.parse(line.slice(5))}catch{continue}
-    if(ev.type==='content_block_delta'&&ev.delta&&ev.delta.type==='text_delta'){acc+=ev.delta.text;if(!raf)raf=requestAnimationFrame(paint)}
-    else if(ev.type==='error')throw new Error((ev.error&&ev.error.message)||'Stream error')}}
- }catch(err){if(err.name!=='AbortError')errText=err.message}
- if(raf)cancelAnimationFrame(raf);
- if(acc){
-  S.msgs[idx].content=acc;body.innerHTML=md(acc,true);const a=el.querySelector('.acts');a.hidden=false;fixRegen();scrollDown();
-  const{data}=await sb.from('messages').insert({chat_id:S.chatId,role:'assistant',content:acc}).select('id').single();
-  if(data)S.msgs[idx].id=data.id;
-  sb.from('chats').update({updated_at:new Date().toISOString()}).eq('id',S.chatId).then(loadChats);
-  const all=[...acc.matchAll(/```html\n([\s\S]*?)```/g)];
-  if(all.length&&['website','3d','admin','clone'].includes(S.mode)&&!errText)openPanel(all[all.length-1][1]);
- }else{S.msgs.pop();el.remove()}
- if(errText){const d=document.createElement('div');d.className='err';d.textContent=errText;$('#log').append(d);scrollDown();loadUsage()}
- setBusy(false);S.ctrl=null}
-authUI();
-</script></body></html>
+export const config = { path: '/api/chat' };
