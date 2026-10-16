@@ -43,8 +43,9 @@ export default async (req) => {
   const plan = b.plan === 'pro' ? 'pro' : b.plan === 'free' ? 'free' : '';
   const days = Math.max(1, Math.min(parseInt(b.days, 10) || 30, 3650));
   if (!email || !plan) return J(400, { error: 'Email and plan are required.' });
-  const msg = await rpc('set_plan', { p_email: email, p_plan: plan, p_days: days });
-  return J(200, { message: typeof msg === 'string' ? msg : 'Done.' });
+  let msg = await rpc('set_plan', { p_email: email, p_plan: plan, p_days: days, p_by: user.email || user.id });
+  if (typeof msg !== 'string') msg = await rpc('set_plan', { p_email: email, p_plan: plan, p_days: days }); // older database without the log column
+  return J(200, { message: typeof msg === 'string' ? msg : 'Could not change the plan.' });
 };
 
 export const config = { path: '/api/admin' };
