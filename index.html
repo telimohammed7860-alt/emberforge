@@ -125,7 +125,7 @@ select{background:var(--c0);border:1px solid var(--line);border-radius:8px;paddi
   <div id="scroll"><div class="col" id="log"></div></div>
   <div class="composer"><div id="vstatus" hidden></div><div class="box">
    <div id="files"></div>
-   <textarea id="in" rows="1" placeholder="Ask anything or describe what you want to build"></textarea>
+   <textarea id="in" rows="1" maxlength="30000" placeholder="Ask anything or describe what you want to build"></textarea>
    <div class="tools">
     
     <select id="model" aria-label="Model"><option value="fast">Fast</option><option value="balanced">Balanced</option><option value="max">Max (Pro)</option></select>
@@ -161,6 +161,8 @@ const EXT={html:'html',css:'css',javascript:'js',js:'js',typescript:'ts',ts:'ts'
 const SUGG=['Ultra-luxury perfume brand site with a rotating 3D bottle','Admin panel for my clothing store connected to Supabase','Recreate the layout of a page I attach, with my own brand','Explain this error and fix my code'];
 try{S.model=localStorage.getItem('ef_model')||S.model}catch{}
 marked.use({gfm:true});
+const PURIFY={FORBID_TAGS:['img','picture','source','video','audio','form','input','button','textarea','select','style','iframe','object','embed','link','meta','base'],FORBID_ATTR:['style','srcset'],ALLOWED_URI_REGEXP:/^(?:https?:|mailto:)/i};
+if(window.DOMPurify)DOMPurify.addHook('afterSanitizeAttributes',n=>{if(n.tagName==='A'&&n.hasAttribute('href')){n.setAttribute('target','_blank');n.setAttribute('rel','noopener noreferrer nofollow')}});
 
 function toast(t){const e=$('#toast');e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,3500)}
 const token=async()=>(await sb.auth.getSession()).data.session.access_token;
@@ -233,7 +235,7 @@ $('#menu').onclick=()=>$('#side').classList.toggle('open');
 
 /* ---------- rendering ---------- */
 function md(t,final){
- const d=document.createElement('div');d.innerHTML=DOMPurify.sanitize(marked.parse(t));
+ const d=document.createElement('div');d.innerHTML=DOMPurify.sanitize(marked.parse(t),PURIFY);
  d.querySelectorAll('pre').forEach(pre=>{const code=pre.querySelector('code');if(!code)return;
   const m=/language-([\w-]+)/.exec(code.className);const lang=m?m[1].toLowerCase():'text';
   if(final&&lang!=='text'&&window.hljs){try{hljs.highlightElement(code)}catch{}}
@@ -300,7 +302,7 @@ $('#fileIn').onchange=async e=>{
    if(!/^image\/(png|jpeg|gif|webp)$/.test(f.type)){toast('Unsupported image type');continue}
    const data=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result.split(',')[1]);fr.readAsDataURL(f)});
    S.files.push({name:f.name,type:'image',mime:f.type,data,size:f.size})}
-  else S.files.push({name:f.name,type:'text',data:await f.text(),size:f.size})}
+  else{if(f.size>150000){toast(f.name+' is too big (text files up to 150 KB)');continue}S.files.push({name:f.name,type:'text',data:await f.text(),size:f.size})}}
  e.target.value='';renderFiles()};
 function renderFiles(){const F=$('#files');F.innerHTML='';S.files.forEach((f,i)=>{const c=document.createElement('span');c.className='fchip';c.textContent=f.name;
  const x=document.createElement('button');x.textContent='x';x.setAttribute('aria-label','Remove '+f.name);x.onclick=()=>{S.files.splice(i,1);renderFiles()};c.append(x);F.append(c)})}
