@@ -108,6 +108,7 @@ select{background:var(--c0);border:1px solid var(--line);border-radius:8px;paddi
  <input class="t" id="email" type="email" placeholder="Email" autocomplete="email" required>
  <input class="t" id="pass" type="password" placeholder="Password (min 8 characters)" minlength="8" autocomplete="current-password" required>
  <button class="main" id="aGo">Sign in</button>
+ <button type="button" class="ghost" id="aHelp">Need help? Chat with us on WhatsApp</button>
  <button type="button" class="ghost" id="aSwap">New here? Create an account</button>
  <div id="aMsg" class="msgline"></div>
 </form></div>
@@ -118,7 +119,7 @@ select{background:var(--c0);border:1px solid var(--line);border-radius:8px;paddi
   <button id="newChat">New chat</button>
   <input class="t" id="search" placeholder="Search chats">
   <nav id="list"></nav>
-  <div class="sfoot"><div id="usage"></div><div id="plan"></div><button id="upgrade" hidden>Upgrade to Pro</button><button id="adminBtn" hidden>Manage users</button><div id="who"></div><button class="ghost" id="out">Sign out</button></div>
+  <div class="sfoot"><div id="usage"></div><div id="plan"></div><button id="upgrade" hidden>Upgrade to Pro</button><button id="adminBtn" hidden>Manage users</button><div id="who"></div><button class="ghost" id="helpBtn">Help on WhatsApp</button><button class="ghost" id="out">Sign out</button></div>
  </aside>
  <section id="main">
   <div class="top"><button class="ghost" id="menu" aria-label="Open chats">Chats</button><div id="title">New chat</div></div>
@@ -296,7 +297,11 @@ $('#pclose').onclick=()=>$('#panel').hidden=true;
 document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#panel').hidden=true});
 
 /* ---------- controls ---------- */
-function upgradeInfo(){const msg='Hi, I want to upgrade to Emberforge Pro.\nMy account email: '+(S.user?S.user.email:'');window.open('https://wa.me/'+WHATSAPP_NUMBER+'?text='+encodeURIComponent(msg),'_blank','noopener')}
+function waOpen(msg){window.open('https://wa.me/'+WHATSAPP_NUMBER+'?text='+encodeURIComponent(msg),'_blank','noopener')}
+function upgradeInfo(){waOpen('Hi, I want to upgrade to Emberforge Pro.\nMy account email: '+(S.user?S.user.email:''))}
+function openHelp(problem){waOpen('Hi, I need help with Emberforge.'+(S.user?'\nMy account email: '+S.user.email:'')+(problem?'\nProblem: '+String(problem).slice(0,300):''))}
+$('#helpBtn').onclick=()=>openHelp('');
+$('#aHelp').onclick=()=>{const t=$('#aMsg').textContent;openHelp(t&&t.length<250?t:'')};
 $('#upgrade').onclick=upgradeInfo;
 $('#model').onchange=e=>{
  if(e.target.value==='max'&&S.plan!=='pro'){e.target.value='balanced';S.model='balanced';toast('Max is a Pro model. Tap Upgrade to Pro (left side) to unlock it.');return}
@@ -369,7 +374,7 @@ async function run(){
   const pg=all.length?all[all.length-1][1]:'';if(pg.length>400&&/<(!doctype|html)/i.test(pg)&&!errText)openPanel(pg);
  }else{S.msgs.pop();el.remove()}
  if(/Pro model/.test(errText)){S.model='balanced';$('#model').value='balanced'}
- if(errText){const d=document.createElement('div');d.className='err';d.textContent=errText;$('#log').append(d);scrollDown();loadUsage()}
+ if(errText){const d=document.createElement('div');d.className='err';d.textContent=errText;const hb=document.createElement('button');hb.className='ghost';hb.textContent='Contact on WhatsApp';hb.onclick=()=>openHelp(errText);d.append(' ',hb);$('#log').append(d);scrollDown();loadUsage()}
  if(V.mode){if(acc)speak(acc,()=>{if(V.mode)setTimeout(listen,400)});else if(errText)voiceOff();else setTimeout(()=>{if(V.mode)listen()},400)}
  setBusy(false);S.ctrl=null}
 
