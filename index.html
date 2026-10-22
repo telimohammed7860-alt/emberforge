@@ -218,7 +218,7 @@ function setUsage(o){
  $('#usage').textContent=t;
  $('#plan').textContent=S.owner?'Owner':S.plan==='pro'?'Pro plan'+(until?' until '+fmtDate(until):''):'Free plan';
  $('#upgrade').hidden=S.plan==='pro';$('#adminBtn').hidden=!S.owner}
-async function loadUsage(){try{const r=await fetch('/api/chat',{headers:{Authorization:'Bearer '+await token()}});if(r.ok){const j=await r.json();setUsage(j)}}catch{}}
+async function loadUsage(){try{const r=await fetch('/api/chat',{headers:{Authorization:'Bearer '+await token()}});if(r.ok){const j=await r.json();if(j&&j.limit!==undefined&&j.used!==undefined)setUsage(j)}}catch{}}
 
 /* ---------- chats ---------- */
 async function loadChats(){const{data,error}=await sb.from('chats').select('id,title,mode,updated_at').order('updated_at',{ascending:false});
@@ -267,7 +267,7 @@ function addMsg(i){
  if(m.role==='user')userBody(body,m.content);
  else{if(m.content)body.innerHTML=md(m.content,true);
   const a=document.createElement('div');a.className='acts';
-  a.innerHTML='<button class="ghost" data-act="copy">Copy</button><button class="ghost" data-act="speak">Listen</button><button class="ghost regen" data-act="regen">Regenerate</button>';el.append(a)}
+  a.innerHTML='<button class="ghost" data-act="copy">Copy</button><button class="ghost" data-act="speak">Listen</button><button class="ghost regen" data-act="regen">Regenerate</button>';el.append(a);addZipButton(el,m.content)}
  $('#log').append(el);return el}
 function fixRegen(){const r=[...document.querySelectorAll('.regen')];r.forEach((b,k)=>b.hidden=k!==r.length-1)}
 function render(){const L=$('#log');L.innerHTML='';
@@ -280,6 +280,7 @@ $('#log').onclick=e=>{const b=e.target.closest('button[data-act]');if(!b)return;
  if(pre){const code=pre.querySelector('code').textContent;
   if(act==='copy')copy(code,b);else if(act==='dl')download(code,pre.dataset.lang);else if(act==='preview')openPanel(code)}
  else if(act==='copy')copy(S.msgs[+b.closest('.msg').dataset.i].content,b);
+ else if(act==='zip')downloadZip(S.msgs[+b.closest('.msg').dataset.i].content);
  else if(act==='speak')toggleSpeak(S.msgs[+b.closest('.msg').dataset.i].content,b);
  else if(act==='regen')regen()};
 function copy(t,b){navigator.clipboard.writeText(t).then(()=>{const o=b.textContent;b.textContent='Copied';setTimeout(()=>b.textContent=o,1200)},()=>toast('Copy not allowed here'))}
@@ -366,7 +367,7 @@ async function run(){
  }catch(err){if(err.name!=='AbortError')errText=err.message}
  if(raf)cancelAnimationFrame(raf);
  if(acc){
-  S.msgs[idx].content=acc;body.innerHTML=md(acc,true);const a=el.querySelector('.acts');a.hidden=false;fixRegen();scrollDown();
+  S.msgs[idx].content=acc;body.innerHTML=md(acc,true);const a=el.querySelector('.acts');a.hidden=false;addZipButton(el,acc);fixRegen();scrollDown();
   const{data}=await sb.from('messages').insert({chat_id:S.chatId,role:'assistant',content:acc}).select('id').single();
   if(data)S.msgs[idx].id=data.id;
   sb.from('chats').update({updated_at:new Date().toISOString()}).eq('id',S.chatId).then(loadChats);
@@ -449,12 +450,63 @@ async function admLoad(){
     const act=document.createElement('div');
     const pro=document.createElement('button');pro.textContent=u.plan==='pro'?'Extend Pro':'Make Pro';pro.onclick=()=>admSet(u.email,'pro');act.append(pro);
     if(u.plan==='pro'){const fr=document.createElement('button');fr.className='ghost';fr.textContent='Make Free';fr.onclick=()=>admSet(u.email,'free');act.append(' ',fr)}
+    const rp=document.createElement('button');rp.className='ghost';rp.textContent='Reset password';rp.onclick=()=>{const pw=prompt('New password for '+u.email+' (8 to 72 characters). You will tell it to the user.');if(pw)admReset(u.email,pw)};act.append(' ',rp);
     row.append(act)}
    L.append(row)})}
  catch(e){L.textContent=e.message}}
 async function admSet(email,plan){
  try{const j=await admApi('POST',{action:'set_plan',email,plan,days:+$('#admDays').value});toast(j.message);admLoad()}catch(e){toast(e.message)}}
+async function admReset(email,password){try{const j=await admApi('POST',{action:'reset_password',email,password});toast(j.message)}catch(e){toast(e.message)}}
 $('#adminBtn').onclick=()=>{$('#adm').hidden=false;admLoad()};
 $('#admClose').onclick=()=>$('#adm').hidden=true;
+
+/* ---------- download all files of a reply as one ZIP ---------- */
+const CRC_T=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+function crc32(b){let c=0xFFFFFFFF;for(let i=0;i<b.length;i++)c=CRC_T[(c^b[i])&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0}
+function makeZip(files){
+ const enc=new TextEncoder(),parts=[],cd=[];let off=0;
+ const d=new Date(),dt=((d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1))&0xFFFF,dd=(((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate())&0xFFFF;
+ files.forEach(f=>{
+  const name=enc.encode(f.name),data=enc.encode(f.content),crc=crc32(data);
+  const lh=new DataView(new ArrayBuffer(30));
+  lh.setUint32(0,0x04034b50,true);lh.setUint16(4,20,true);lh.setUint16(6,0x0800,true);lh.setUint16(8,0,true);lh.setUint16(10,dt,true);lh.setUint16(12,dd,true);lh.setUint32(14,crc,true);lh.setUint32(18,data.length,true);lh.setUint32(22,data.length,true);lh.setUint16(26,name.length,true);lh.setUint16(28,0,true);
+  parts.push(new Uint8Array(lh.buffer),name,data);
+  const ch=new DataView(new ArrayBuffer(46));
+  ch.setUint32(0,0x02014b50,true);ch.setUint16(4,20,true);ch.setUint16(6,20,true);ch.setUint16(8,0x0800,true);ch.setUint16(10,0,true);ch.setUint16(12,dt,true);ch.setUint16(14,dd,true);ch.setUint32(16,crc,true);ch.setUint32(20,data.length,true);ch.setUint32(24,data.length,true);ch.setUint16(28,name.length,true);ch.setUint32(42,off,true);
+  cd.push(new Uint8Array(ch.buffer),name);
+  off+=30+name.length+data.length});
+ let cdSize=0;cd.forEach(x=>cdSize+=x.length);
+ const end=new DataView(new ArrayBuffer(22));
+ end.setUint32(0,0x06054b50,true);end.setUint16(8,files.length,true);end.setUint16(10,files.length,true);end.setUint32(12,cdSize,true);end.setUint32(16,off,true);
+ return new Blob([...parts,...cd,new Uint8Array(end.buffer)],{type:'application/zip'})}
+function pathFrom(line){
+ let s=(line||'').trim();if(!s||s.length>140)return'';
+ s=s.replace(/^#{1,6}\s+/,'').replace(/^\d+[.)]\s+/,'');
+ const m=/^(?:(?:\/\/|#|--|\/\*|<!--)\s*)?(?:file(?:name)?\s*[:=]?\s*|path\s*[:=]\s*)?[`*"' ]*([\w@.\-\/\\]+\.[A-Za-z0-9]{1,8})[`*"' :]*(?:\*\/|-->)?\s*$/i.exec(s);
+ if(!m)return'';
+ const name=m[1].replace(/\\/g,'/').replace(/^\/+/,'').split('/').filter(p=>p&&p!=='..'&&p!=='.').join('/');
+ return name&&!/^\d+(\.\d+)*$/.test(name)?name:''}
+function extractFiles(text){
+ const lines=(text||'').split('\n'),files=[],used=new Set();let i=0,prev='',n=0;
+ while(i<lines.length){
+  const m=/^```([\w+-]*)\s*$/.exec(lines[i]);
+  if(!m){if(lines[i].trim())prev=lines[i];i++;continue}
+  const lang=(m[1]||'').toLowerCase(),body=[];i++;
+  while(i<lines.length&&!/^```\s*$/.test(lines[i])){body.push(lines[i]);i++}
+  i++;
+  let name=pathFrom(body[0]);if(name)body.shift();else name=pathFrom(prev);
+  prev='';
+  if(!body.join('').trim())continue;
+  if(!name){if(['bash','sh','shell','console','terminal','zsh'].includes(lang))continue;n++;name=(lang==='html'&&!used.has('index.html')?'index':'file'+n)+'.'+(EXT[lang]||'txt')}
+  let u=name,k=1;while(used.has(u)){k++;u=name.replace(/(\.[^./]+)?$/,'-'+k+'$1')}
+  used.add(u);files.push({name:u,content:body.join('\n')+'\n'})}
+ return files}
+function downloadZip(text){
+ const files=extractFiles(text);if(!files.length){toast('No code files found in this reply');return}
+ const a=document.createElement('a');a.href=URL.createObjectURL(makeZip(files));a.download='emberforge-project.zip';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000)}
+function addZipButton(el,content){
+ const a=el.querySelector('.acts');if(!a||a.querySelector('[data-act=zip]'))return;
+ const n=extractFiles(content).length;if(n<2)return;
+ const b=document.createElement('button');b.className='ghost';b.dataset.act='zip';b.textContent='Download '+n+' files (ZIP)';a.insertBefore(b,a.firstChild)}
 authUI();
 </script></body></html>
