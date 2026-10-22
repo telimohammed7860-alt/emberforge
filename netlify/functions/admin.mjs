@@ -38,6 +38,35 @@ export default async (req) => {
 
   let b = {};
   try { b = await req.json(); } catch (e) {}
+  if (b.action === 'reset_password') {
+    const email = typeof b.email === 'string' ? b.email.trim().slice(0, 254) : '';
+    const password = typeof b.password === 'string' ? b.password : '';
+    if (!email) return J(400, { error: 'Email is required.' });
+    if (password.length < 8 || password.length > 72) return J(400, { error: 'Password must be 8 to 72 characters.' });
+    const pr = await fetch(`${SB}/rest/v1/profiles?email=eq.${encodeURIComponent(email)}&select=id,is_owner`, {
+      headers: { apikey: KEY, Authorization: 'Bearer ' + KEY }
+    });
+    const rows = await pr.json().catch(() => []);
+    const target = Array.isArray(rows) ? rows[0] : null;
+    if (!target) return J(404, { error: 'No such user.' });
+    if (target.is_owner) return J(400, { error: 'The owner password cannot be changed here.' });
+    const ur = await fetch(`${SB}/auth/v1/admin/users/${encodeURIComponent(target.id)}`, {
+      method: 'PUT',
+      headers: { apikey: KEY, Authorization: 'Bearer ' + KEY, 'content-type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+    if (!ur.ok) {
+      const e = await ur.json().catch(() => ({}));
+      console.error('reset password failed', ur.status, JSON.stringify(e).slice(0, 200));
+      return J(400, { error: String(e.msg || e.message || 'Could not change the password.').slice(0, 200) });
+    }
+    await fetch(SB + '/rest/v1/admin_log', {
+      method: 'POST',
+      headers: { apikey: KEY, Authorization: 'Bearer ' + KEY, 'content-type': 'application/json' },
+      body: JSON.stringify({ actor: user.email || user.id, action: 'reset_password', target: email, detail: 'password changed' })
+    }).catch(() => {});
+    return J(200, { message: 'Password changed for ' + email + '. Tell the user the new password.' });
+  }
   if (b.action !== 'set_plan') return J(400, { error: 'Unknown action.' });
   const email = typeof b.email === 'string' ? b.email.trim().slice(0, 200) : '';
   const plan = b.plan === 'pro' ? 'pro' : b.plan === 'free' ? 'free' : '';
